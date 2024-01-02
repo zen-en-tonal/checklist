@@ -22,7 +22,10 @@ pub enum CheckError {
 
 impl Display for CheckError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        let msg = match self {
+            CheckError::InvalidKind => "Invalid kind",
+        };
+        f.write_str(msg)
     }
 }
 
