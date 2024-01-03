@@ -13,6 +13,86 @@ pub trait Checker {
 pub enum Notice {
     Clear,
     Attention(String),
+    Error(String),
+}
+
+impl From<Notice> for Result<Notice, String> {
+    fn from(value: Notice) -> Self {
+        match value {
+            Notice::Clear => Ok(Notice::Clear),
+            Notice::Attention(msg) => Ok(Notice::Attention(msg)),
+            Notice::Error(msg) => Err(msg),
+        }
+    }
+}
+
+impl PartialOrd for Notice {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(match (self, other) {
+            (Notice::Clear, Notice::Clear) => std::cmp::Ordering::Equal,
+            (Notice::Clear, _) => std::cmp::Ordering::Less,
+            (_, Notice::Clear) => std::cmp::Ordering::Greater,
+            (Notice::Error(_), Notice::Attention(_)) => std::cmp::Ordering::Greater,
+            (Notice::Attention(_), Notice::Error(_)) => std::cmp::Ordering::Less,
+            (_, _) => std::cmp::Ordering::Equal,
+        })
+    }
+}
+
+impl Ord for Notice {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+pub enum CheckerMode<T> {
+    Attention(T),
+    Error(T),
+}
+
+impl<T> Checker for CheckerMode<T>
+where
+    T: Checker,
+{
+    fn check(&self, value: &Value) -> Result<Notice, CheckError> {
+        Ok(match self {
+            CheckerMode::Attention(c) => match c.check(value)? {
+                Notice::Clear => Notice::Clear,
+                Notice::Attention(msg) => Notice::Attention(msg),
+                Notice::Error(msg) => Notice::Error(msg),
+            },
+            CheckerMode::Error(c) => match c.check(value)? {
+                Notice::Clear => Notice::Clear,
+                Notice::Attention(msg) => Notice::Error(msg),
+                Notice::Error(msg) => Notice::Error(msg),
+            },
+        })
+    }
+
+    fn expecting(&self) -> Vec<ValueKind> {
+        match self {
+            CheckerMode::Attention(c) => c.expecting(),
+            CheckerMode::Error(c) => c.expecting(),
+        }
+    }
+}
+
+pub trait SwitchMode: Sized {
+    fn into_attention(self) -> CheckerMode<Self>;
+    fn into_error(self) -> CheckerMode<Self>;
+}
+
+impl<T> SwitchMode for T
+where
+    T: Checker,
+{
+    fn into_attention(self) -> CheckerMode<Self> {
+        CheckerMode::Attention(self)
+    }
+
+    fn into_error(self) -> CheckerMode<Self> {
+        CheckerMode::Error(self)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,15 +134,18 @@ where
     T: Checker,
 {
     fn check(&self, value: &Value) -> Result<Notice, CheckError> {
-        let res = self
+        let mut res = self
             .0
             .iter()
             .map(|x| x.check(value))
             .collect::<Result<Vec<Notice>, CheckError>>()?;
+        res.sort();
+        res.reverse();
         for n in res {
             match n {
                 Notice::Clear => {}
                 Notice::Attention(msg) => return Ok(Notice::Attention(msg)),
+                Notice::Error(msg) => return Ok(Notice::Error(msg)),
             }
         }
         Ok(Notice::Clear)

@@ -62,7 +62,7 @@ pub struct Commit {
 #[cfg(test)]
 mod tests {
     use crate::{
-        check::{Checkers, Notice},
+        check::{Checkers, Notice, SwitchMode},
         commit::CheckList,
     };
 
@@ -73,15 +73,15 @@ mod tests {
         let lists = vec![
             (
                 "A".to_string(),
-                Checkers::Exact("abc".to_string(), "caution".to_string()),
+                Checkers::Exact("abc".to_string(), "caution".to_string()).into_attention(),
             ),
             (
                 "B".to_string(),
-                Checkers::Between(-5.0, 5.0, "error".to_string()),
+                Checkers::Between(-2.0, 2.0, "caution".to_string()).into_attention(),
             ),
             (
                 "B".to_string(),
-                Checkers::Between(-2.0, 2.0, "caution".to_string()),
+                Checkers::Between(-5.0, 5.0, "error".to_string()).into_error(),
             ),
         ];
         let map = lists.into_checklist().unwrap();
@@ -103,7 +103,7 @@ mod tests {
         );
         assert_eq!(
             map.commit("B", 6.0.into()).unwrap().unwrap().notice,
-            Notice::Attention("error".to_string())
+            Notice::Error("error".to_string())
         );
     }
 }
