@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use crate::{
-    check::{CheckError, Checker, Checkers, Flatten, IntoFlat, Notice},
+    check::{CheckError, Checker, Flatten, FlattenError, IntoFlat, Notice},
     value::{Value, ValueKind},
 };
 
@@ -12,7 +12,10 @@ pub trait CheckList {
     fn items(&self) -> HashMap<String, Vec<ValueKind>>;
 }
 
-impl CheckList for HashMap<String, Flatten<Checkers>> {
+impl<T> CheckList for HashMap<String, Flatten<T>>
+where
+    T: Checker,
+{
     fn commit(&self, key: &str, value: Value) -> Result<Option<Commit>, CheckError> {
         let Some(n) = self.get(key) else {
             return Ok(None);
@@ -33,11 +36,14 @@ impl CheckList for HashMap<String, Flatten<Checkers>> {
 }
 
 pub trait IntoCheckList {
-    fn into_checklist(self) -> Result<impl CheckList, String>;
+    fn into_checklist(self) -> Result<impl CheckList, FlattenError>;
 }
 
-impl IntoCheckList for Vec<(String, Checkers)> {
-    fn into_checklist(self) -> Result<impl CheckList, String> {
+impl<T> IntoCheckList for Vec<(String, T)>
+where
+    T: Checker,
+{
+    fn into_checklist(self) -> Result<impl CheckList, FlattenError> {
         let mut hashmap = HashMap::new();
         for (k, v) in &self.into_iter().group_by(|x| x.0.to_string()) {
             hashmap.insert(k, v.map(|x| x.1).into_flat()?);
@@ -88,15 +94,15 @@ mod tests {
             Notice::Attention("caution".to_string())
         );
         assert_eq!(
-            map.commit("B", 0.into()).unwrap().unwrap().notice,
+            map.commit("B", 0.0.into()).unwrap().unwrap().notice,
             Notice::Clear
         );
         assert_eq!(
-            map.commit("B", 3.into()).unwrap().unwrap().notice,
+            map.commit("B", 3.0.into()).unwrap().unwrap().notice,
             Notice::Attention("caution".to_string())
         );
         assert_eq!(
-            map.commit("B", 6.into()).unwrap().unwrap().notice,
+            map.commit("B", 6.0.into()).unwrap().unwrap().notice,
             Notice::Attention("error".to_string())
         );
     }

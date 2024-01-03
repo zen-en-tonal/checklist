@@ -34,6 +34,15 @@ impl From<i32> for Value {
     }
 }
 
+impl From<f32> for Value {
+    fn from(value: f32) -> Self {
+        Value {
+            inner: value.to_string(),
+            kind: ValueKind::Number,
+        }
+    }
+}
+
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
         Value {

@@ -37,13 +37,13 @@ impl<T> Flatten<T>
 where
     T: Checker,
 {
-    fn new<Iter>(x: Iter) -> Result<Self, String>
+    fn new<Iter>(x: Iter) -> Result<Self, FlattenError>
     where
         Iter: Iterator<Item = T>,
     {
         let v = x.collect_vec();
         if !v.iter().map(|x| x.expecting()).all_equal() {
-            return Err("".to_string());
+            return Err(FlattenError::InvalidKind);
         }
         Ok(Flatten(v))
     }
@@ -74,7 +74,7 @@ where
 }
 
 pub trait IntoFlat<T>: Sized {
-    fn into_flat(self) -> Result<Flatten<T>, String>;
+    fn into_flat(self) -> Result<Flatten<T>, FlattenError>;
 }
 
 impl<T, Q> IntoFlat<T> for Q
@@ -82,10 +82,26 @@ where
     T: Checker,
     Q: Iterator<Item = T>,
 {
-    fn into_flat(self) -> Result<Flatten<T>, String> {
+    fn into_flat(self) -> Result<Flatten<T>, FlattenError> {
         Flatten::new(self)
     }
 }
+
+#[derive(Debug)]
+pub enum FlattenError {
+    InvalidKind,
+}
+
+impl Display for FlattenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = match self {
+            FlattenError::InvalidKind => "Invalid kind",
+        };
+        f.write_str(msg)
+    }
+}
+
+impl Error for FlattenError {}
 
 pub enum Checkers {
     Any,
